@@ -1200,6 +1200,25 @@ module.exports = {
 		"yourCalendars_label": "Your calendars",
 		"yourFolders_action": "YOUR FOLDERS",
 		"yourMessage_label": "Your message",
-		"you_label": "You"
+		"you_label": "You",
+		"outOfOfficeNotification_title": "Out of office notification",
+		"outOfOfficeDefault_msg": "Hello,\n<br>\n<br>thanks for your email. I am out of the office and will be back soon. Until then I will have limited access to my email.\n<br>\n<br>Kind Regards",
+		"outOfOfficeDefaultSubject_msg": "I am out of the office",
+		"invalidTimePeriod_msg": "The entered time period is invalid.",
+		"message_label": "Message",
+		"outOfOfficeEnabled_msg": "Auto-reply is enabled.",
+		"outOfOfficeDisabled_msg": "Auto-reply is disabled.",
+		"outOfOfficeInternal_msg": "Inside your organization",
+		"outOfOfficeExternal_msg": "Default notification",
+		"notificationsEnabled_label": "Enabled",
+		"outOfOfficeMessageInvalid_msg": "The subject and/or message is invalid.",
+		"configuration_label": "Configuration",
+		"outOfOfficeExplanation_msg": "Please configure the automatic reply message that is sent upon receiving new mail.",
+		"outOfOfficeTimeRange_msg": "Only send during this time range:",
+		"outOfOfficeTimeRangeHelp_msg": "Check to pick dates.",
+		"outOfOfficeEnableInternal_msg": "Send a different notification inside my organization.",
+		"outOfOfficeEnableInternalHelp_msg": "Check to configure the message, that is sent inside your organization.",
+		"outOfOfficeEnableExternal_msg": "Send the default notification outside my organization.",
+		"outOfOfficeEnableExternalHelp_msg": "Uncheck if you only want to send notifications inside your organization."
 	}
 }

@@ -17,7 +17,7 @@ export type TextFieldAttrs = {
 	type?: TextFieldTypeEnum,
 	helpLabel?: ?lazy<Children>,
 	alignRight?: boolean,
-	injectionsLeft?: lazy<Children>, // only used by the BubbleTextField to display bubbles
+	injectionsLeft?: lazy<Children>, // only used by the BubbleTextField to display bubbles and out of office notification
 	injectionsRight?: lazy<Children>,
 	keyHandler?: keyHandler, // interceptor used by the BubbleTextField to react on certain keys
 	onfocus?: (dom: HTMLElement, input: HTMLInputElement) => mixed,
@@ -80,7 +80,7 @@ export class _TextField {
 				},
 			}, lang.getMaybeLazy(a.label)),
 			m(".flex.flex-column", [ // another wrapper to fix IE 11 min-height bug https://github.com/philipwalton/flexbugs#3-min-height-on-a-flex-container-wont-apply-to-its-flex-items
-				m(".flex.items-end.flex-wrap", {
+				m(".flex.items-end", { //TODO we would need the class .flex-wrap for BubbleTextField
 					style: {
 						'min-height': px(size.button_height + 2), // 2 px border
 						'padding-bottom': this.active ? px(0) : px(1),

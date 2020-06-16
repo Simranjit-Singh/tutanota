@@ -26,6 +26,14 @@ export const REQUEST_SIZE_LIMIT_MAP: Map<string, number> = new Map([
 	["/rest/tutanota/draftservice", 1024 * 1024], // should be large enough
 ])
 
+export const OutOfOfficeNotificationMessageType = Object.freeze({
+	Default: "0",
+	SameOrganization: "1"
+})
+export type OutOfOfficeNotificationMessageTypeEnum = $Values<typeof OutOfOfficeNotificationMessageType>
+
+export const OUT_OF_OFFICE_SUBJECT_PREFIX = "Auto-reply: "
+
 export const GroupType = Object.freeze({
 	User: "0",
 	Admin: "1",
