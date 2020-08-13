@@ -3,7 +3,7 @@ import pluginBabel from "@rollup/plugin-babel"
 import commonjs from "@rollup/plugin-commonjs"
 import path from "path"
 import Promise from "bluebird"
-import fs from "fs"
+import fs from "fs-extra"
 
 const {babel} = pluginBabel
 
