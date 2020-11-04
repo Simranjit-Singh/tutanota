@@ -50,7 +50,7 @@ export function arrayHash(array: Uint8Array): number {
 
 /**
  * Remove the element from theArray if it is contained in the array.
- * @param theArray The array to remove the element from.
+ * @param theArray The array to remove the element from.z
  * @param elementToRemove The element to remove from the array.
  * @return True if the element was removed, false otherwise.
  */
@@ -253,4 +253,22 @@ export function deduplicate<T>(arr: Array<T>, comp: (T, T) => boolean = (a, b) =
 		}
 	})
 	return deduplicated
+}
+
+// http://jsfiddle.net/aryzhov/pkfst550/
+export function binarySearch<T>(ar: Array<T>, el: T, compare_fn: (T, T) => number): number {
+	var m = 0;
+	var n = ar.length - 1;
+	while (m <= n) {
+		var k = (n + m) >> 1;
+		var cmp = compare_fn(el, ar[k]);
+		if (cmp > 0) {
+			m = k + 1;
+		} else if (cmp < 0) {
+			n = k - 1;
+		} else {
+			return k;
+		}
+	}
+	return -m - 1;
 }

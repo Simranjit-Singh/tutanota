@@ -1,6 +1,6 @@
 // @flow
 import o from "ospec/ospec.js"
-import type {FutureBatchActions, QueuedBatch} from "../../../../src/api/worker/search/EventQueue"
+import type {QueuedBatch} from "../../../../src/api/worker/search/EventQueue"
 import {EventQueue} from "../../../../src/api/worker/search/EventQueue"
 import {replaceAllMaps, spy} from "../../TestUtils"
 import {createEntityUpdate} from "../../../../src/api/entities/sys/EntityUpdate"
@@ -11,7 +11,7 @@ import {ConnectionError} from "../../../../src/api/common/error/RestError"
 
 o.spec("EventQueueTest", function () {
 	let queue: EventQueue
-	let processElement: (nextElement: QueuedBatch, futureActions: FutureBatchActions) => Promise<void>
+	let processElement: (nextElement: QueuedBatch) => Promise<void>
 	let lastProcess: {resolve: () => void, reject: (Error) => void, promise: Promise<void>}
 
 	const newUpdate = (type: OperationTypeEnum, instanceId: string) => {
@@ -24,13 +24,13 @@ o.spec("EventQueueTest", function () {
 	o.beforeEach(function () {
 		lastProcess = defer()
 		processElement = spy(() => {
-			if (queue._eventQueue.length == 1) {
+			if (queue._eventQueue.length === 1) {
 				// the last element is removed right after processing it
 				lastProcess.resolve()
 			}
 			return Promise.resolve()
 		})
-		queue = new EventQueue(downcast({sendError: () => null}), processElement)
+		queue = new EventQueue(processElement)
 	})
 
 	o("addBatches & start", async function () {
@@ -137,14 +137,14 @@ o.spec("EventQueueTest", function () {
 
 		lastProcess = defer()
 		processElement = spy(() => {
-			if (queue._eventQueue.length == 1) {
+			if (queue._eventQueue.length === 1) {
 				// the last element is removed right after processing it
 				lastProcess.resolve()
 			}
 			return Promise.resolve()
 		})
-		let queue = new EventQueue(downcast({sendError: () => null}), (nextElement: QueuedBatch, futureActions: FutureBatchActions) => {
-			if (nextElement.batchId == "2") {
+		let queue = new EventQueue((nextElement: QueuedBatch) => {
+			if (nextElement.batchId === "2") {
 				return Promise.reject(new ConnectionError("no connection"))
 			} else {
 				o("should not be called").equals(true)
@@ -174,7 +174,7 @@ o.spec("EventQueueTest", function () {
 
 		lastProcess = defer()
 		processElement = spy(() => {
-			if (queue._eventQueue.length == 1) {
+			if (queue._eventQueue.length === 1) {
 				// the last element is removed right after processing it
 				lastProcess.resolve()
 			}
@@ -182,8 +182,8 @@ o.spec("EventQueueTest", function () {
 		})
 		const sentErrors = []
 		let error = new Error("other error handling")
-		let queue = new EventQueue(downcast({sendError: (e) => sentErrors.push(e)}), (nextElement: QueuedBatch, futureActions: FutureBatchActions) => {
-			if (nextElement.batchId == "2") {
+		let queue = new EventQueue((nextElement: QueuedBatch) => {
+			if (nextElement.batchId === "2") {
 				return Promise.reject(error)
 			} else {
 				o("should not be called").equals(true)

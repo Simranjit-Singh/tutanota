@@ -34,7 +34,6 @@ import {createEntityUpdate} from "../../../../src/api/entities/sys/EntityUpdate"
 import {browserDataStub, makeCore, mock, replaceAllMaps, spy} from "../../TestUtils"
 import {downcast, neverNull} from "../../../../src/api/common/utils/Utils"
 import {fixedIv} from "../../../../src/api/worker/crypto/CryptoUtils"
-import type {FutureBatchActions} from "../../../../src/api/worker/search/EventQueue"
 import {EventQueue} from "../../../../src/api/worker/search/EventQueue"
 import {getDayShifted, getStartOfDay} from "../../../../src/api/common/utils/DateUtils"
 import {createMailboxGroupRoot} from "../../../../src/api/entities/tutanota/MailboxGroupRoot"
@@ -64,7 +63,6 @@ class FixedDateProvider implements DateProvider {
 }
 
 const dbMock: any = {iv: fixedIv}
-const emptyFutureActions: FutureBatchActions = {deleted: new Map(), moved: new Map()}
 const emptyFutureActionsObj = {deleted: {}, moved: {}}
 const mailId = "L-dNNLe----0"
 
@@ -515,7 +513,7 @@ o.spec("MailIndexer test", () => {
 				createUpdate(OperationType.CREATE, "mail-list", "1"), createUpdate(OperationType.UPDATE, "mail-list", "2"),
 				createUpdate(OperationType.DELETE, "mail-list", "3")
 			]
-			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate, emptyFutureActions)
+			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate)
 			// nothing changed
 			o(indexUpdate.create.encInstanceIdToElementData.size).equals(0)
 			o(indexUpdate.move.length).equals(0)
@@ -527,7 +525,7 @@ o.spec("MailIndexer test", () => {
 			const indexer = _prepareProcessEntityTests(true)
 			let events = [createUpdate(OperationType.CREATE, "new-mail-list", mailId)]
 
-			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate, emptyFutureActions)
+			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate)
 			// nothing changed
 			o(indexer.processNewMail.invocations.length).equals(1)
 			o(indexUpdate.create.encInstanceIdToElementData.size).equals(1)
@@ -542,7 +540,7 @@ o.spec("MailIndexer test", () => {
 				createUpdate(OperationType.DELETE, "old-mail-list", mailId)
 			]
 
-			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate, emptyFutureActions)
+			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate)
 			// nothing changed
 			o(indexUpdate.create.encInstanceIdToElementData.size).equals(0)
 			o(indexer.processMovedMail.invocations.length).equals(1)
@@ -555,7 +553,7 @@ o.spec("MailIndexer test", () => {
 			const indexer = _prepareProcessEntityTests(true)
 			let events = [createUpdate(OperationType.DELETE, "mail-list", mailId)]
 
-			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate, emptyFutureActions)
+			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate)
 			o(indexUpdate.create.encInstanceIdToElementData.size).equals(0)
 			o(indexUpdate.move.length).equals(0)
 			o(indexer._core._processDeleted.callCount).equals(1)
@@ -566,7 +564,7 @@ o.spec("MailIndexer test", () => {
 			const indexer = _prepareProcessEntityTests(true, MailState.DRAFT)
 			let events = [createUpdate(OperationType.UPDATE, "new-mail-list", mailId)]
 
-			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate, emptyFutureActions)
+			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate)
 			o(indexUpdate.create.encInstanceIdToElementData.size).equals(1)
 			o(indexUpdate.move.length).equals(0)
 			o(indexer._core._processDeleted.callCount).equals(1)
@@ -577,7 +575,7 @@ o.spec("MailIndexer test", () => {
 			const indexer = _prepareProcessEntityTests(true, MailState.RECEIVED)
 			let events = [createUpdate(OperationType.UPDATE, "new-mail-list", mailId)]
 
-			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate, emptyFutureActions)
+			await indexer.processEntityEvents(events, "group-id", "batch-id", indexUpdate)
 			o(indexUpdate.create.encInstanceIdToElementData.size).equals(0)
 			o(indexUpdate.move.length).equals(0)
 			o(indexer._core._processDeleted.callCount).equals(0)
@@ -598,7 +596,7 @@ o.spec("MailIndexer test", () => {
 			const deleted = {[deleteEvent.instanceId]: deleteEvent}
 			const futureActions = makeFutureActions({}, deleted)
 
-			await indexer.processEntityEvents([event], "group-id", "batch-id", indexUpdate, futureActions)
+			await indexer.processEntityEvents([event], "group-id", "batch-id", indexUpdate)
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer._core._processDeleted.callCount).equals(0)("Should not call processDeleted")
@@ -607,7 +605,7 @@ o.spec("MailIndexer test", () => {
 				deleted
 			})("Should not change futureActions")
 
-			await indexer.processEntityEvents([deleteEvent], "group-id", "batch-id2", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteEvent], "group-id", "batch-id2", indexUpdate)
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer._core._processDeleted.callCount).equals(1)("Should call processDeleted")
@@ -622,7 +620,7 @@ o.spec("MailIndexer test", () => {
 			const moved = {[event.instanceId]: createAgainEvent}
 			const futureActions = makeFutureActions(moved, {})
 
-			await indexer.processEntityEvents([event], "group-id", "batch-id", indexUpdate, futureActions)
+			await indexer.processEntityEvents([event], "group-id", "batch-id", indexUpdate)
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer._core._processDeleted.callCount).equals(0)("Should not call processDeleted")
@@ -631,7 +629,7 @@ o.spec("MailIndexer test", () => {
 				deleted: {}
 			})("Should not change futureActions")
 
-			await indexer.processEntityEvents([deleteEvent, createAgainEvent], "group-id", "batch-id2", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteEvent, createAgainEvent], "group-id", "batch-id2", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([[createAgainEvent, indexUpdate]])("Should call processMovedMail")
 			o(indexer._core._processDeleted.callCount).equals(0)("Should not call processDeleted")
 			o(replaceAllMaps(futureActions)).deepEquals(emptyFutureActionsObj)("Should clear futureActions")
@@ -648,7 +646,7 @@ o.spec("MailIndexer test", () => {
 			const deleted = {[deleteAgainEvent.instanceId]: deleteAgainEvent}
 			const futureActions = makeFutureActions(moved, deleted)
 
-			await indexer.processEntityEvents([deleteEvent, createEvent], "group-id", "batch-id", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteEvent, createEvent], "group-id", "batch-id", indexUpdate)
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer._core._processDeleted.callCount).equals(0)("Should not call processDeleted")
@@ -657,7 +655,7 @@ o.spec("MailIndexer test", () => {
 				moved: {}
 			})("Should clear move actions")
 
-			await indexer.processEntityEvents([deleteAgainEvent], "group-id", "batch-id2", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteAgainEvent], "group-id", "batch-id2", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer._core._processDeleted.callCount).equals(1)("Should call processDeleted once")
 			o(indexer._core._processDeleted.args).deepEquals([deleteAgainEvent, indexUpdate])
@@ -675,7 +673,7 @@ o.spec("MailIndexer test", () => {
 			const moved = {[createAgainEvent.instanceId]: createAgainEvent}
 			const futureActions = makeFutureActions(moved, {})
 
-			await indexer.processEntityEvents([deleteEvent, createEvent], "group-id", "batch-id", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteEvent, createEvent], "group-id", "batch-id", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer._core._processDeleted.callCount).equals(0)("Should not call processDeleted")
@@ -685,7 +683,7 @@ o.spec("MailIndexer test", () => {
 			})("Should not change futureActions")
 
 
-			await indexer.processEntityEvents([deleteAgainEvent, createAgainEvent], "group-id", "batch-id2", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteAgainEvent, createAgainEvent], "group-id", "batch-id2", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([
 				[createAgainEvent, indexUpdate]
 			])("Should call processMovedMail")
@@ -704,7 +702,7 @@ o.spec("MailIndexer test", () => {
 			const moved = {[createEvent.instanceId]: createEvent}
 			const futureActions = makeFutureActions(moved, {})
 
-			await indexer.processEntityEvents([updateEvent], "group-id", "batch-id", indexUpdate, futureActions)
+			await indexer.processEntityEvents([updateEvent], "group-id", "batch-id", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer._core._processDeleted.callCount).equals(1)("Should call processDeleted")
@@ -714,7 +712,7 @@ o.spec("MailIndexer test", () => {
 				deleted: {}
 			})("Should not change futureActions")
 
-			await indexer.processEntityEvents([deleteEvent, createEvent], "group-id", "batch-id2", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteEvent, createEvent], "group-id", "batch-id2", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([
 				[createEvent, indexUpdate]
 			])("Should call processMovedMail")
@@ -732,7 +730,7 @@ o.spec("MailIndexer test", () => {
 			const deleted = {[deleteEvent.instanceId]: deleteEvent}
 			const futureActions = makeFutureActions({}, deleted)
 
-			await indexer.processEntityEvents([updateEvent], "group-id", "batch-id", indexUpdate, futureActions)
+			await indexer.processEntityEvents([updateEvent], "group-id", "batch-id", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer._core._processDeleted.callCount).equals(0)("Should not call processDeleted")
@@ -741,7 +739,7 @@ o.spec("MailIndexer test", () => {
 				moved: {}
 			})("Should not change futureActions")
 
-			await indexer.processEntityEvents([deleteEvent], "group-id", "batch-id2", indexUpdate, futureActions)
+			await indexer.processEntityEvents([deleteEvent], "group-id", "batch-id2", indexUpdate)
 			o(indexer.processMovedMail.invocations).deepEquals([])("Should not call processMovedMail")
 			o(indexer.processNewMail.invocations).deepEquals([])("Should not call processNewMail")
 			o(indexer._core._processDeleted.callCount).equals(1)("Should call processDeleted")
@@ -854,7 +852,7 @@ async function indexMailboxTest(startTimestamp: number, endIndexTimstamp: number
 	let core: IndexerCore = downcast({
 		printStatus: () => {
 		},
-		queue: mock(new EventQueue(downcast({sendError: () => null}), () => Promise.resolve()), (mock) => {
+		queue: mock(new EventQueue(() => Promise.resolve()), (mock) => {
 			mock.pause = spy(mock.pause.bind(mock))
 			mock.resume = spy(mock.resume.bind(mock))
 		}),
@@ -933,15 +931,14 @@ function _prepareProcessEntityTests(indexingEnabled: boolean, mailState: MailSta
 }
 
 function makeFutureActions(moved: {[string]: EntityUpdate}, deleted: {[string]: EntityUpdate}): FutureBatchActions {
-	const movedMap = new Map()
+	const actions = new FutureBatchActions()
 	for (let mk of Object.keys(moved)) {
-		movedMap.set(mk, moved[mk])
+		actions.lastMove.set(mk, moved[mk])
 	}
-	const deletedMap = new Map()
 	for (let dk of Object.keys(deleted)) {
-		deletedMap.set(dk, deleted[dk])
+		actions.futureDelete.set(dk, deleted[dk])
 	}
-	return {moved: movedMap, deleted: deletedMap}
+	return actions
 }
 
 
