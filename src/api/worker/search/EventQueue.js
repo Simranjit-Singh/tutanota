@@ -77,14 +77,37 @@ export class EventQueue {
 			const currentBatch = this._lastOperationForEntity.get(elementId)
 			if (currentBatch == null || this._processingActive != null && this._processingActive === currentBatch) {
 				// If there's no current operation, there's nothing to merge, just add
-			// If current operation is already being processed, don't modify it, we cannot merge anymore and should just append.
+				// If current operation is already being processed, don't modify it, we cannot merge anymore and should just append.
 				newBatch.events.push(next)
 			} else {
 				const nextMod = batchMod(events, next.instanceId)
 				const currentMod = batchMod(currentBatch.events, next.instanceId)
 				if (nextMod === EntityModificationType.DELETE) {
+					// We are shadowing newBatch here because we don't want to add it to the end of the queue, we want ot move it
+					// earlier in the queue
+					const newBatch = {events: [], groupId, batchId}
 					newBatch.events.push(next)
-					// TODO: cancel everything else for this entity in the queue
+					// Cancel everything else for this entity in the queue
+					// We are going through the queue, removing all events with this instanceId and at the same time looking for a place
+					// to insert our delete operation.
+					let lastFittingBatchIndex = -1
+					for (let batchIndex = 0; batchIndex < this._eventQueue.length; batchIndex++) {
+						const batchInThePast = this._eventQueue[batchIndex]
+						if (this._processingActive === batchInThePast) {
+							break
+						}
+						for (let i = batchInThePast.events.length - 1; i >= 0; i--) {
+							if (batchInThePast.events[i].instanceId === next.instanceId) {
+								lastFittingBatchIndex = batchIndex
+								batchInThePast.events.splice(i, 1)
+							}
+						}
+					}
+					if (lastFittingBatchIndex !== -1) {
+						// TODO: Do we need to change batch ID here or no one cares?
+						this._eventQueue.splice(lastFittingBatchIndex + 1, 0, newBatch)
+						this._lastOperationForEntity.set(next.instanceId, newBatch)
+					}
 				} else if (currentMod === EntityModificationType.CREATE && nextMod === EntityModificationType.UPDATE) {
 					// Skip the update because the create was not processed yet and we will download the updated version already
 				} else if (currentMod === EntityModificationType.CREATE && nextMod === EntityModificationType.MOVE) {
@@ -168,7 +191,7 @@ export class EventQueue {
 				    //  handled
 				    // processing continues if the event bus receives a new event
 				    this._processingActive = null
-			    	if (!(e instanceof ServiceUnavailableError || e instanceof ConnectionError)) {
+				    if (!(e instanceof ServiceUnavailableError || e instanceof ConnectionError)) {
 					    console.error("Uncaught EventQueue error!", e)
 				    }
 			    })
@@ -194,76 +217,3 @@ export class EventQueue {
 		batch.events.push(newMod)
 	}
 }
-
-// export class EventQueue {
-// 	_processingActive: boolean
-// 	_eventQueue: QueuedBatch[]
-// 	_processNextQueueElement: (nextElement: QueuedBatch, futureActions: FutureBatchActions) => Promise<void>
-// 	_futureActions: FutureBatchActions
-// 	_paused: boolean
-// 	_worker: WorkerImpl
-//
-// 	constructor(worker: WorkerImpl, processNextQueueElement: (nextElement: QueuedBatch, futureActions: FutureBatchActions) => Promise<void>) {
-// 		this._worker = worker
-// 		this._processingActive = false
-// 		this._eventQueue = []
-// 		this._processNextQueueElement = processNextQueueElement
-// 		this._futureActions = new FutureBatchActions()
-// 		this._paused = false
-// 	}
-//
-// 	start() {
-// 		if (this._processingActive) {
-// 			return
-// 		}
-// 		this._processNext()
-// 	}
-//
-// 	_processNext() {
-// 		if (this._paused) {
-// 			return
-// 		}
-// 		if (this._eventQueue.length > 0) {
-// 			this._processingActive = true
-// 			this._processNextQueueElement(this._eventQueue[0], this._futureActions)
-// 			    .then(() => {
-// 				    this._eventQueue.shift()
-// 				    this._processingActive = false
-// 				    this._processNext()
-// 			    })
-// 			    .catch(ServiceUnavailableError, e => {
-// 				    // processing continues if the event bus receives a new event
-// 				    this._processingActive = false
-// 			    })
-// 			    .catch(ConnectionError, e => {
-// 				    // processing continues if the event bus receives a new event
-// 				    this._processingActive = false
-// 			    })
-// 			    .catch(e => {
-// 				    // processing continues if the event bus receives a new event
-// 				    this._processingActive = false
-// 				    this._worker.sendError(e)
-// 			    })
-// 		}
-// 	}
-//
-// 	addBatches(batches: QueuedBatch[]) {
-// 		this._futureActions.populate(batches.map(b => b.events))
-// 		for (let el of batches) {
-// 			this._eventQueue.push(el)
-// 		}
-// 	}
-//
-// 	clear() {
-// 		this._eventQueue.splice(0)
-// 	}
-//
-// 	pause() {
-// 		this._paused = true
-// 	}
-//
-// 	resume() {
-// 		this._paused = false
-// 		this.start()
-// 	}
-// }

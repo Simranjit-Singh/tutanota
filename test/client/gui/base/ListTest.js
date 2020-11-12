@@ -65,8 +65,8 @@ o.spec("List", function () {
 			window.requestAnimationFrame = requestAnimationFrame
 		})
 
-		o("update range updates the backing list", function (done, timeout) {
-			timeout(300)
+		o("update range updates the backing list", async function () {
+			o.timeout(300)
 			const mail0 = createMail()
 			const mail5 = createMail()
 			let db = new Array(1000).fill(mail0).fill(mail5, 103, 108)
@@ -89,10 +89,6 @@ o.spec("List", function () {
 				showStatus: false,
 				swipe: defaultSwipe,
 			})
-			list.loadInitial().then(() => {
-				o(list._loadedEntities.slice(0, 100)).deepEquals(new Array(100).fill(mail0))
-				done()
-			})
 
 			list._domListContainer = downcast({
 				clientWidth: 100,
@@ -104,6 +100,9 @@ o.spec("List", function () {
 			list._setDomList(downcast({style: {}}))
 			list._init()
 			list._domInitialized.resolve()
+
+			await list.loadInitial()
+			o(list._loadedEntities.slice(0, 100)).deepEquals(new Array(100).fill(mail0))
 		})
 	})
 
@@ -142,15 +141,15 @@ o.spec("List", function () {
 				addEventListener: function () {
 				}
 			})
-			await list.loadInitial()
-			list._init()
-			list._createVirtualElements()
-			o(list._virtualList.length).equals(Math.ceil(235 / 62) + ScrollBuffer * 2)
-
 			list._domInitialized.resolve()
 			list._domLoadingRow = downcast({classList: {add: () => undefined, remove: () => undefined}, style: {}})
 			list._setDomList(downcast({style: {}}))
 			list._init()
+
+			await list.loadInitial()
+			list._init()
+			list._createVirtualElements()
+			o(list._virtualList.length).equals(Math.ceil(235 / 62) + ScrollBuffer * 2)
 		})
 	})
 })

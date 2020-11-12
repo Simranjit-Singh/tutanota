@@ -3,7 +3,7 @@ import o from "ospec/ospec.js"
 import {createUser, UserTypeRef} from "../../../../src/api/entities/sys/User"
 import {createGroupMembership} from "../../../../src/api/entities/sys/GroupMembership"
 import {DbTransaction, GroupDataOS, MetaDataOS} from "../../../../src/api/worker/search/DbFacade"
-import {GroupType, NOTHING_INDEXED_TIMESTAMP} from "../../../../src/api/common/TutanotaConstants"
+import {GroupType, NOTHING_INDEXED_TIMESTAMP, OperationType} from "../../../../src/api/common/TutanotaConstants"
 import {Indexer, Metadata} from "../../../../src/api/worker/search/Indexer"
 import {createEntityEventBatch, EntityEventBatchTypeRef} from "../../../../src/api/entities/sys/EntityEventBatch"
 import {GENERATED_MAX_ID, getElementId, TypeRef} from "../../../../src/api/common/EntityFunctions"
@@ -24,6 +24,7 @@ import {EntityRestClient} from "../../../../src/api/worker/rest/EntityRestClient
 import {MembershipRemovedError} from "../../../../src/api/common/error/MembershipRemovedError"
 import {WhitelabelChildTypeRef} from "../../../../src/api/entities/sys/WhitelabelChild"
 import {fixedIv} from "../../../../src/api/worker/crypto/CryptoUtils"
+import type {OperationTypeEnum} from "../../../../src/api/common/TutanotaConstants"
 
 const restClientMock: EntityRestClient = downcast({})
 
@@ -725,22 +726,26 @@ o.spec("Indexer test", () => {
 			})
 		})
 
-		function update(typeRef: TypeRef<any>) {
-			let u = createEntityUpdate()
-			u.application = typeRef.app
-			u.type = typeRef.type
-			return u
-		}
 
 
-		let events1 = [update(MailTypeRef)]
+		const events1 = [createEntityUpdate({
+			application: MailTypeRef.app,
+			type: MailTypeRef.type,
+			operation: OperationType.CREATE,
+			instanceId: "id-1"
+		})]
 		indexer._indexedGroupIds = ["group-id"]
 		const batch1: QueuedBatch = {
 			events: events1,
 			groupId: "group-id",
 			batchId: "batch-id-1"
 		}
-		let events2 = [update(MailTypeRef)]
+		const events2 = [createEntityUpdate({
+			application: MailTypeRef.app,
+			type: MailTypeRef.type,
+			operation: OperationType.CREATE,
+			instanceId: "id-2"
+		})]
 		indexer._indexedGroupIds = ["group-id"]
 		const batch2: QueuedBatch = {
 			events: events2,
