@@ -72,7 +72,6 @@ o.spec("List", function () {
 			let db = new Array(1000).fill(mail0).fill(mail5, 103, 108)
 			let list = new List({
 				fetch: (start, count) => {
-					console.log("fetch", start, count)
 					if (start !== GENERATED_MAX_ID) {
 						throw new Error("wrong start")
 					}
@@ -121,8 +120,8 @@ o.spec("List", function () {
 			window.requestAnimationFrame = requestAnimationFrame
 		})
 
-		o("create virtual elements according to visible area and buffer size", (done, timeout) => {
-			timeout(100)
+		o("create virtual elements according to visible area and buffer size", async function () {
+			o.timeout(100)
 			let list = new List({
 				rowHeight: 62,
 				fetch: () => Promise.resolve(new Array(100).fill(createMail())),
@@ -143,13 +142,10 @@ o.spec("List", function () {
 				addEventListener: function () {
 				}
 			})
-			list.loadInitial().then(() => {
-				list._init()
-				list._createVirtualElements()
-				o(list._virtualList.length).equals(Math.ceil(235 / 62) + ScrollBuffer * 2)
-			}).finally(() => {
-				done()
-			})
+			await list.loadInitial()
+			list._init()
+			list._createVirtualElements()
+			o(list._virtualList.length).equals(Math.ceil(235 / 62) + ScrollBuffer * 2)
 
 			list._domInitialized.resolve()
 			list._domLoadingRow = downcast({classList: {add: () => undefined, remove: () => undefined}, style: {}})

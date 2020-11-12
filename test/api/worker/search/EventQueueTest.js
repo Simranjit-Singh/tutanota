@@ -11,7 +11,7 @@ import {ConnectionError} from "../../../../src/api/common/error/RestError"
 
 o.spec("EventQueueTest", function () {
 	let queue: EventQueue
-	let processElement: (nextElement: QueuedBatch) => Promise<void>
+	let processElement: OspecSpy<(nextElement: QueuedBatch) => Promise<void>>
 	let lastProcess: {resolve: () => void, reject: (Error) => void, promise: Promise<void>}
 
 	const newUpdate = (type: OperationTypeEnum, instanceId: string) => {
@@ -23,7 +23,7 @@ o.spec("EventQueueTest", function () {
 
 	o.beforeEach(function () {
 		lastProcess = defer()
-		processElement = spy(() => {
+		processElement = o.spy(() => {
 			if (queue._eventQueue.length === 1) {
 				// the last element is removed right after processing it
 				lastProcess.resolve()
@@ -83,7 +83,7 @@ o.spec("EventQueueTest", function () {
 
 		await lastProcess.promise
 
-		o(replaceAllMaps(downcast(processElement).invocations)).deepEquals(batches.map((b) => [b, expectedFutureActions]))
+		o(replaceAllMaps(processElement.calls.map(c => c.args))).deepEquals(batches.map((b) => [b, expectedFutureActions]))
 		o(queue._processingActive).equals(false)
 		o(queue._eventQueue.length).equals(0)
 	})
@@ -136,7 +136,7 @@ o.spec("EventQueueTest", function () {
 		}
 
 		lastProcess = defer()
-		processElement = spy(() => {
+		processElement = o.spy(() => {
 			if (queue._eventQueue.length === 1) {
 				// the last element is removed right after processing it
 				lastProcess.resolve()
@@ -173,7 +173,7 @@ o.spec("EventQueueTest", function () {
 		}
 
 		lastProcess = defer()
-		processElement = spy(() => {
+		processElement = o.spy(() => {
 			if (queue._eventQueue.length === 1) {
 				// the last element is removed right after processing it
 				lastProcess.resolve()
@@ -199,4 +199,28 @@ o.spec("EventQueueTest", function () {
 		o(sentErrors).deepEquals([error])
 	})
 
+	o.spec("collapsing events", function () {
+		o("create + delete == delete", async function () {
+			const cretaeEvent = createUpdate(OperationType.CREATE, "new-mail-list", "1", "u1")
+			const deleteEvent = createUpdate(OperationType.DELETE, cretaeEvent.instanceListId, cretaeEvent.instanceId, "u2")
+
+			queue.add("batch-id", "group-id", [cretaeEvent, deleteEvent])
+			queue.start()
+			await lastProcess.promise
+			o(processElement.calls.map(c => c.args)).deepEquals([
+				deleteEvent
+			])
+		})
+
+		function createUpdate(type: OperationTypeEnum, listId: Id, instanceId: Id, eventId?: Id) {
+			let update = createEntityUpdate()
+			update.operation = type
+			update.instanceListId = listId
+			update.instanceId = instanceId
+			if (eventId) {
+				update._id = eventId
+			}
+			return update
+		}
+	})
 })
