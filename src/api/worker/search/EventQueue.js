@@ -171,6 +171,10 @@ export class EventQueue {
 		this._processNext()
 	}
 
+	queueSize(): number {
+		return this._eventQueue.length
+	}
+
 	_processNext() {
 		if (this._paused) {
 			return
