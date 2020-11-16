@@ -23,7 +23,7 @@ import {
 	SessionExpiredError
 } from "../common/error/RestError"
 import {EntityEventBatchTypeRef} from "../entities/sys/EntityEventBatch"
-import {downcast, identity, neverNull, ProgressMonitor, randomIntFromInterval} from "../common/utils/Utils"
+import {AggregateProgressMonitor, downcast, identity, neverNull, ProgressMonitor, randomIntFromInterval} from "../common/utils/Utils"
 import {OutOfSyncError} from "../common/error/OutOfSyncError"
 import {binarySearch, contains} from "../common/utils/ArrayUtils"
 import type {Indexer} from "./search/Indexer"
@@ -95,7 +95,7 @@ export class EventBusClient {
 	 */
 	_serviceUnavailableRetry: ?Promise<void>;
 	_failedConnectionAttempts: number = 0;
-	_progressMonitor: ?ProgressMonitor;
+	_progressMonitor: ?AggregateProgressMonitor;
 
 	constructor(worker: WorkerImpl, indexer: Indexer, cache: EntityRestInterface, mail: MailFacade, login: LoginFacade) {
 		this._worker = worker
@@ -127,7 +127,7 @@ export class EventBusClient {
 				           this._worker.sendError(e)
 			           })
 			           .then(() => {
-				           this._progressMonitor && this._progressMonitor.workDone(1)
+				           this._progressMonitor && this._progressMonitor.workDone(1, 1)
 			           })
 		})
 		this._serviceUnavailableRetry = null
@@ -147,11 +147,19 @@ export class EventBusClient {
 		// make sure a retry will be cancelled by setting _serviceUnavailableRetry to null
 		this._serviceUnavailableRetry = null
 		this._worker.updateWebSocketState("connecting")
-		// Task for updating events are number of groups + 3. Use 2 as base for reconnect state and 1 for processing queued events.
-		const entityEventProgress = new ProgressMonitor(this._eventGroups().length + 3, (percentage) => {
-			if (reconnect) this._worker.updateEntityEventProgress(percentage / 2)
+
+		// Task for updating events are number of groups + 2. Use 2 as base for reconnect state.
+		const entityEventProgress = new AggregateProgressMonitor((percentage) => {
+			if (reconnect) this._worker.updateEntityEventProgress(percentage)
 		})
-		entityEventProgress.workDone(1)
+		// First stage is loading missed events
+		entityEventProgress.addStage(0.5, this._eventGroups().length + 2)
+		// Second stage is processing events
+		entityEventProgress.addStage(0.5, 1)
+		entityEventProgress.workDone(0, 1)
+		if (reconnect) {
+			this._progressMonitor = entityEventProgress
+		}
 		this._state = EventBusState.Automatic
 		this._connectTimer = null
 
@@ -171,7 +179,7 @@ export class EventBusClient {
 			this._failedConnectionAttempts = 0
 			console.log("ws open: ", new Date(), "state:", this._state);
 			// Indicate some progress right away
-			entityEventProgress.workDone(1)
+			entityEventProgress.workDone(0, 1)
 			this._initEntityEvents(reconnect, entityEventProgress)
 			this._worker.updateWebSocketState("connected")
 		};
@@ -180,7 +188,7 @@ export class EventBusClient {
 		this._socket.onmessage = (message: MessageEvent) => this._message(message);
 	}
 
-	_initEntityEvents(reconnect: boolean, entityEventProgress: ProgressMonitor) {
+	_initEntityEvents(reconnect: boolean, entityEventProgress: AggregateProgressMonitor) {
 		let existingConnection = reconnect && Object.keys(this._lastEntityEventIds).length > 0
 		let p = existingConnection ? this._loadMissedEntityEvents(entityEventProgress) : this._setLatestEntityEventIds()
 		p.catch(ConnectionError, e => {
@@ -393,7 +401,7 @@ export class EventBusClient {
 		})
 	}
 
-	_loadMissedEntityEvents(initialProgressMonitor: ProgressMonitor): Promise<void> {
+	_loadMissedEntityEvents(progressMonitor: AggregateProgressMonitor): Promise<void> {
 		if (this._login.isLoggedIn()) {
 			if (Date.now() > this._lastUpdateTime + ENTITY_EVENT_BATCH_EXPIRE_MS) {
 				// we did not check for updates for too long, so some missed EntityEventBatches can not be loaded any more
@@ -411,18 +419,16 @@ export class EventBusClient {
 					           .catch(NotAuthorizedError, () => {
 						           console.log("could not download entity updates => lost permission")
 					           })
-					           .finally(() => initialProgressMonitor.workDone(1))
+					           .finally(() => progressMonitor.workDone(0, 1))
 				}).then(() => {
 					this._lastUpdateTime = Date.now()
-					let totalEventNumber = this._eventQueue.queueSize()
-					const progressMonitor = this._progressMonitor = new ProgressMonitor(totalEventNumber, (percentage) => {
-						// Do not make 150 out of 100, otherwise simulate "the second part" by adding 50%
-						return this._worker.updateEntityEventProgress(percentage === 100 ? percentage : percentage + 50)
-					})
-					if (this._eventQueue.queueSize() === 0) {
-						progressMonitor.completed()
+					const totalEventNumber = this._eventQueue.queueSize()
+					if (totalEventNumber === 0) {
+						progressMonitor.completedStage(1)
+					} else {
+						progressMonitor.setStageTotalWork(1, totalEventNumber)
+						this._processQueuedEvents()
 					}
-					this._processQueuedEvents()
 				})
 			}
 		} else {
