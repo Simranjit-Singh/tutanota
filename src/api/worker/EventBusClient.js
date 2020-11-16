@@ -85,7 +85,7 @@ export class EventBusClient {
 	_lastUpdateTime: number; // the last time we received an EntityEventBatch or checked for updates. we use this to find out if our data has expired, see ENTITY_EVENT_BATCH_EXPIRE_MS
 	_lastAntiphishingMarkersId: ?Id;
 
-	_websocketWrapperQueue: EventQueue;
+	_eventQueue: EventQueue;
 
 	_reconnectTimer: ?TimeoutID;
 	_connectTimer: ?TimeoutID;
@@ -120,7 +120,7 @@ export class EventBusClient {
 		this._immediateReconnect = false
 		this._lastEntityEventIds = {}
 		this._lastUpdateTime = 0
-		this._websocketWrapperQueue = new EventQueue((modification) => {
+		this._eventQueue = new EventQueue((modification) => {
 			return this._processEventBatch(modification)
 			           .catch((e) => {
 				           console.log("Error while processing event batches", e)
@@ -148,11 +148,10 @@ export class EventBusClient {
 		this._serviceUnavailableRetry = null
 		this._worker.updateWebSocketState("connecting")
 		// Task for updating events are number of groups + 3. Use 2 as base for reconnect state and 1 for processing queued events.
-		// const entityEventProgress = new ProgressMonitor(this._eventGroups().length + 3, (percentage) => {
-		// 	if (reconnect) this._worker.updateEntityEventProgress(percentage)
-		// })
-		// entityEventProgress.workDone(1)
-		this._worker.updateEntityEventProgress(1)
+		const entityEventProgress = new ProgressMonitor(this._eventGroups().length + 3, (percentage) => {
+			if (reconnect) this._worker.updateEntityEventProgress(percentage / 2)
+		})
+		entityEventProgress.workDone(1)
 		this._state = EventBusState.Automatic
 		this._connectTimer = null
 
@@ -172,9 +171,8 @@ export class EventBusClient {
 			this._failedConnectionAttempts = 0
 			console.log("ws open: ", new Date(), "state:", this._state);
 			// Indicate some progress right away
-			// entityEventProgress.workDone(1)
-			this._worker.updateEntityEventProgress(2)
-			this._initEntityEvents(reconnect)
+			entityEventProgress.workDone(1)
+			this._initEntityEvents(reconnect, entityEventProgress)
 			this._worker.updateWebSocketState("connected")
 		};
 		this._socket.onclose = (event: CloseEvent) => this._close(event);
@@ -182,9 +180,9 @@ export class EventBusClient {
 		this._socket.onmessage = (message: MessageEvent) => this._message(message);
 	}
 
-	_initEntityEvents(reconnect: boolean) {
+	_initEntityEvents(reconnect: boolean, entityEventProgress: ProgressMonitor) {
 		let existingConnection = reconnect && Object.keys(this._lastEntityEventIds).length > 0
-		let p = existingConnection ? this._loadMissedEntityEvents() : this._setLatestEntityEventIds()
+		let p = existingConnection ? this._loadMissedEntityEvents(entityEventProgress) : this._setLatestEntityEventIds()
 		p.catch(ConnectionError, e => {
 			console.log("not connected in connect(), close websocket", e)
 			this.close(CloseEventBusOption.Reconnect)
@@ -205,7 +203,7 @@ export class EventBusClient {
 				// if we have a websocket reconnect we have to stop retrying
 				if (this._serviceUnavailableRetry === promise) {
 					console.log("retry initializing entity events")
-					return this._initEntityEvents(reconnect)
+					return this._initEntityEvents(reconnect, entityEventProgress)
 				} else {
 					console.log("cancel initializing entity events")
 				}
@@ -266,10 +264,10 @@ export class EventBusClient {
 		//console.log("ws message: ", message.data);
 		const [type, value] = downcast(message.data).split(";")
 		if (type === "entityUpdate") {
-			// specify type explicitly because decryptAndMapToInstance effectively returns `any`
+			// specify type of decrypted entity explicitly because decryptAndMapToInstance effectively returns `any`
 			return decryptAndMapToInstance(WebsocketEntityDataTypeModel, JSON.parse(value), null).then((data: WebsocketEntityData) => {
 				this._addBatch(data.eventBatchId, data.eventBatchOwner, data.eventBatch)
-				this._websocketWrapperQueue.resume()
+				this._eventQueue.resume()
 				// TODO: move this somewhere
 				// .catch(ConnectionError, e => {
 				// 							this._queueWebsocketEvents = false
@@ -398,34 +396,38 @@ export class EventBusClient {
 		})
 	}
 
-	_loadMissedEntityEvents(): Promise<void> {
+	_loadMissedEntityEvents(initialProgressMonitor: ProgressMonitor): Promise<void> {
 		if (this._login.isLoggedIn()) {
 			if (Date.now() > this._lastUpdateTime + ENTITY_EVENT_BATCH_EXPIRE_MS) {
 				// we did not check for updates for too long, so some missed EntityEventBatches can not be loaded any more
 				return this._worker.sendError(new OutOfSyncError())
 			} else {
-				return Promise.each(this._eventGroups(), (groupId, index) => {
+				return Promise.each(this._eventGroups(), (groupId) => {
 					return this._entity
 					           .loadAll(EntityEventBatchTypeRef, groupId, this._getLastEventBatchIdOrMinIdForGroup(groupId))
 					           .then((eventBatches) => {
-							           return Promise.each(
-								           eventBatches,
-								           (batch) => this._addBatch(getElementId(batch), groupId, batch.events)
-							           )
+							           initialProgressMonitor.workDone(1)
+							           for (const batch of eventBatches) {
+								           this._addBatch(getElementId(batch), groupId, batch.events)
+							           }
 						           }
 					           )
 					           .catch(NotAuthorizedError, () => {
 						           console.log("could not download entity updates => lost permission")
 					           })
-					           .finally(() => {
-						           this._worker.updateEntityEventProgress(index + 2)
-					           })
+					// .finally(() => {
+					//     this._worker.updateEntityEventProgress(index + 2)
+					// })
 				}).then(() => {
 					this._lastUpdateTime = Date.now()
-					let totalEventNumber = this._websocketWrapperQueue.queueSize()
-					this._progressMonitor = new ProgressMonitor(totalEventNumber + this._eventGroups().length + 2, (percentage) => {
-						return this._worker.updateEntityEventProgress(percentage)
+					let totalEventNumber = this._eventQueue.queueSize()
+					const progressMonitor = this._progressMonitor = new ProgressMonitor(totalEventNumber, (percentage) => {
+						// Do not make 150 out of 100, otherwise simulate "the second part" by adding 50%
+						return this._worker.updateEntityEventProgress(percentage === 100 ? percentage : percentage + 50)
 					})
+					if (this._eventQueue.queueSize() === 0) {
+						progressMonitor.completed()
+					}
 					this._processQueuedEvents()
 					// TODO
 					//        .then(() => {
@@ -449,11 +451,11 @@ export class EventBusClient {
 			lastForGroup.shift()
 		}
 		this._lastEntityEventIds[batchId] = lastForGroup
-		this._websocketWrapperQueue.add(batchId, groupId, events)
+		this._eventQueue.add(batchId, groupId, events)
 	}
 
 	_processQueuedEvents() {
-		this._websocketWrapperQueue.resume()
+		this._eventQueue.resume()
 	}
 
 	_processEventBatch(batch: QueuedBatch): Promise<void> {
