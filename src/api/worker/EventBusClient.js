@@ -212,10 +212,7 @@ export class EventBusClient {
 			return promise
 		}).catch(e => {
 			this._worker.sendError(e)
-		}).finally(() => {
-			// TODO
-			// entityEventProgress.completed()
-		}) //Done or Failed. We want to show full progress bar for 500ms to indicate that we are done. Don't show the progress bar anymore afterwards.
+		})
 	}
 
 
@@ -406,7 +403,6 @@ export class EventBusClient {
 					return this._entity
 					           .loadAll(EntityEventBatchTypeRef, groupId, this._getLastEventBatchIdOrMinIdForGroup(groupId))
 					           .then((eventBatches) => {
-							           initialProgressMonitor.workDone(1)
 							           for (const batch of eventBatches) {
 								           this._addBatch(getElementId(batch), groupId, batch.events)
 							           }
@@ -415,9 +411,7 @@ export class EventBusClient {
 					           .catch(NotAuthorizedError, () => {
 						           console.log("could not download entity updates => lost permission")
 					           })
-					// .finally(() => {
-					//     this._worker.updateEntityEventProgress(index + 2)
-					// })
+					           .finally(() => initialProgressMonitor.workDone(1))
 				}).then(() => {
 					this._lastUpdateTime = Date.now()
 					let totalEventNumber = this._eventQueue.queueSize()
@@ -429,11 +423,6 @@ export class EventBusClient {
 						progressMonitor.completed()
 					}
 					this._processQueuedEvents()
-					// TODO
-					//        .then(() => {
-					// 	entityEventProgress.workDone(1)
-					// }
-					// )
 				})
 			}
 		} else {
