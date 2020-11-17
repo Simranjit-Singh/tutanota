@@ -120,6 +120,10 @@ export class EventBusClient {
 		this._immediateReconnect = false
 		this._lastEntityEventIds = {}
 		this._lastUpdateTime = 0
+		if (this._eventQueue) {
+			this._eventQueue.pause()
+			this._eventQueue.clear()
+		}
 		this._eventQueue = new EventQueue((modification) => {
 			return this._processEventBatch(modification)
 			           .catch((e) => {
@@ -153,10 +157,10 @@ export class EventBusClient {
 			if (reconnect) this._worker.updateEntityEventProgress(percentage)
 		})
 		// First stage is loading missed events
-		entityEventProgress.addStage(0.5, this._eventGroups().length + 2)
+		entityEventProgress.addStage(/*part*/0.5, /*totalWork*/this._eventGroups().length + 2)
 		// Second stage is processing events
-		entityEventProgress.addStage(0.5, 1)
-		entityEventProgress.workDone(0, 1)
+  		entityEventProgress.addStage(/*part*/0.5,/*totalWork*/ 1)
+		entityEventProgress.workDone(/*stageNumber*/0, /*amount*/1)
 		if (reconnect) {
 			this._progressMonitor = entityEventProgress
 		}

@@ -205,6 +205,9 @@ export class EventQueue {
 
 	clear() {
 		this._eventQueue.splice(0)
+		for (const k of this._lastOperationForEntity.keys()) {
+			this._lastOperationForEntity.delete(k)
+		}
 	}
 
 	pause() {
