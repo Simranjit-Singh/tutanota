@@ -29,7 +29,7 @@ import {_TypeModel as PhishingMarkerWebsocketDataTypeModel} from "../entities/tu
 import type {EntityUpdate} from "../entities/sys/EntityUpdate"
 import type {EntityRestInterface} from "./rest/EntityRestClient"
 import {EntityClient} from "../common/EntityClient"
-import {ProgressMonitorDelegate} from "./WorkerImpl"
+import {ProgressMonitorDelegate} from "./ProgressMonitorDelegate"
 
 assertWorkerOrNode()
 
