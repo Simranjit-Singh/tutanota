@@ -9,6 +9,7 @@ import type {OperationTypeEnum} from "../../../../src/api/common/TutanotaConstan
 import {OperationType} from "../../../../src/api/common/TutanotaConstants"
 import {defer} from "../../../../src/api/common/utils/Utils"
 import {ConnectionError} from "../../../../src/api/common/error/RestError"
+import {MailTypeRef} from "../../../../src/api/entities/tutanota/Mail"
 
 o.spec("EventQueueTest", function () {
 	let queue: EventQueue
@@ -211,6 +212,8 @@ o.spec("EventQueueTest", function () {
 			update.operation = type
 			update.instanceListId = listId
 			update.instanceId = instanceId
+			update.type = MailTypeRef.type
+			update.application = MailTypeRef.app
 			if (eventId) {
 				update._id = eventId
 			}
