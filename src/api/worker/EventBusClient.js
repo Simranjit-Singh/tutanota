@@ -159,7 +159,7 @@ export class EventBusClient {
 		// First stage is loading missed events
 		entityEventProgress.addStage(/*part*/0.5, /*totalWork*/this._eventGroups().length + 2)
 		// Second stage is processing events
-  		entityEventProgress.addStage(/*part*/0.5,/*totalWork*/ 1)
+		entityEventProgress.addStage(/*part*/0.5,/*totalWork*/ 1)
 		entityEventProgress.workDone(/*stageNumber*/0, /*amount*/1)
 		if (reconnect) {
 			this._progressMonitor = entityEventProgress
@@ -277,12 +277,6 @@ export class EventBusClient {
 			return decryptAndMapToInstance(WebsocketEntityDataTypeModel, JSON.parse(value), null).then((data: WebsocketEntityData) => {
 				this._addBatch(data.eventBatchId, data.eventBatchOwner, data.eventBatch)
 				this._eventQueue.resume()
-				// TODO: move this somewhere
-				// .catch(ConnectionError, e => {
-				// 							this._queueWebsocketEvents = false
-				// 							console.log("not connected in _message(), close websocket", e)
-				// 							this.close(CloseEventBusOption.Reconnect)
-				// 						}
 			})
 		} else if (type === "unreadCounterUpdate") {
 			this._worker.updateCounter(JSON.parse(value))

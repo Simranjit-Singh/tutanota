@@ -5,10 +5,11 @@ import {assertNotNull, containsEventOfType} from "../../common/utils/Utils"
 import {ConnectionError, ServiceUnavailableError} from "../../common/error/RestError"
 import type {WorkerImpl} from "../WorkerImpl"
 import type {EntityUpdate} from "../../entities/sys/EntityUpdate"
-import {isSameId} from "../../common/EntityFunctions"
+import {isSameId, isSameTypeRefByAttr} from "../../common/EntityFunctions"
 import {firstThrow, last} from "../../common/utils/ArrayUtils"
 import {ProgrammingError} from "../../common/error/ProgrammingError"
 import {createEntityUpdate} from "../../entities/sys/EntityUpdate"
+import {MailTypeRef} from "../../entities/tutanota/Mail"
 
 export type QueuedBatch = {
 	events: EntityUpdate[], groupId: Id, batchId: Id
@@ -25,16 +26,27 @@ export type EntityModificationTypeEnum = $Values<typeof EntityModificationType>
 
 type QueueAction = (nextElement: QueuedBatch) => Promise<void>
 
+/**
+ * Whether the entity of the event supports MOVE operation. MOVE is supposed to be immutable so we cannot apply it to all instances.
+ */
+function isMovableEventType(event: EntityUpdate): boolean {
+	return isSameTypeRefByAttr(MailTypeRef, event.application, event.type)
+}
+
 export function batchMod(events: $ReadOnlyArray<EntityUpdate>, id: Id): EntityModificationTypeEnum {
 	for (const event of events) {
 		if (event.instanceId === id) {
 			switch (event.operation) {
 				case OperationType.CREATE:
-					return containsEventOfType(events, OperationType.DELETE, id) ? EntityModificationType.MOVE : EntityModificationType.CREATE
+					return isMovableEventType(event) && containsEventOfType(events, OperationType.DELETE, id)
+						? EntityModificationType.MOVE
+						: EntityModificationType.CREATE
 				case OperationType.UPDATE:
 					return EntityModificationType.UPDATE
 				case OperationType.DELETE:
-					return containsEventOfType(events, OperationType.CREATE, id) ? EntityModificationType.MOVE : EntityModificationType.DELETE
+					return isMovableEventType(event) && containsEventOfType(events, OperationType.CREATE, id)
+						? EntityModificationType.MOVE
+						: EntityModificationType.DELETE
 				default:
 					throw new ProgrammingError(`Unknown operation: ${event.operation}`)
 			}
@@ -44,7 +56,7 @@ export function batchMod(events: $ReadOnlyArray<EntityUpdate>, id: Id): EntityMo
 }
 
 export class EventQueue {
-	/** Batches to processs. Oldest first. */
+	/** Batches to process. Oldest first. */
 	+_eventQueue: Array<QueuedBatch>;
 	+_lastOperationForEntity: Map<Id, QueuedBatch>;
 	+_queueAction: QueueAction;
