@@ -23,12 +23,14 @@ export function rollupDebugPlugins(baseDir) {
 				"@babel/plugin-transform-flow-strip-types",
 				"@babel/plugin-proposal-class-properties",
 				"@babel/plugin-syntax-dynamic-import"
-			]
+			],
+			sourceMaps: true,
 		}),
 		resolveLibs(baseDir),
 		commonjs({
 			exclude: ["src/**"],
-			ignore: ["util"]
+			// include: ["libs/**"],
+			sourceMap: false,
 		}),
 	]
 }

@@ -1,72 +1,78 @@
 import bluebird from "bluebird"
-import crypto from "crypto"
 import xhr2 from "xhr2"
 import express from "express"
 import server_destroy from "server-destroy"
 import body_parser from "body-parser"
 
-global.env = __TUTANOTA_ENV
+globalThis.env = __TUTANOTA_ENV
 
-// node environment: mock a few browser functions
-global.Promise = bluebird.Promise
+globalThis.Promise = bluebird.Promise
 Promise.config({
 	longStackTraces: true
 })
 
-global.isBrowser = false
+globalThis.isBrowser = typeof window !== "undefined"
 
-global.btoa = function (str) {
-	return Buffer.from(str, 'binary').toString('base64')
-}
-global.atob = function (b64Encoded) {
-	return Buffer.from(b64Encoded, 'base64').toString('binary')
-}
-global.crypto = {
-	getRandomValues: function (bytes) {
-		let randomBytes = crypto.randomBytes(bytes.length)
-		bytes.set(randomBytes)
+;(async function () {
+	if (isBrowser) {
+		/**
+		 * runs this test exclusively on browsers (not nodec)
+		 */
+		window.browser = function (func) {
+			return func
+		}
+
+		/**
+		 * runs this test exclusively on node (not browsers)
+		 */
+		window.node = function () {
+			return function () {
+			}
+		}
+	} else {
+		const noOp = () => {}
+
+		/**
+		 * runs this test exclusively on browsers (not node)
+		 */
+		globalThis.browser = () => noOp
+
+		/**
+		 * runs this test exclusively on node (not browsers)
+		 */
+		globalThis.node = func => func
+		globalThis.btoa = str => Buffer.from(str, 'binary').toString('base64')
+		globalThis.atob = b64Encoded => Buffer.from(b64Encoded, 'base64').toString('binary')
+		globalThis.WebSocket = noOp
+
+		const nowOffset = Date.now();
+		globalThis.performance = {
+			now: function () {
+				return Date.now() - nowOffset;
+			}
+		}
+		globalThis.performance = {
+			now: Date.now,
+			mark: noOp,
+			measure: noOp,
+		}
+		const crypto = await import("crypto")
+		globalThis.crypto = {
+			getRandomValues: function (bytes) {
+				let randomBytes = crypto.randomBytes(bytes.length)
+				bytes.set(randomBytes)
+			}
+		}
 	}
-}
 
-global.XMLHttpRequest = xhr2
-global.express = express
-global.enableDestroy = server_destroy
-global.bodyParser = body_parser
+	globalThis.XMLHttpRequest = xhr2
+	globalThis.express = express
+	globalThis.enableDestroy = server_destroy
+	globalThis.bodyParser = body_parser
 
-global.WebSocket = function () {
-}
+	import("../../src/api/Env.js").then((module) => {
+		module.bootFinished()
+		import('./Suite.js')
+	})
+})()
 
-const nowOffset = Date.now();
-global.performance = {
-	now: function () {
-		return Date.now() - nowOffset;
-	}
-}
-
-const noOp = () => {}
-
-global.performance = {
-	now: Date.now,
-	mark: noOp,
-	measure: noOp,
-}
-
-/**
- * runs this test exclusively on browsers (not node)
- */
-global.browser = function (func) {
-	return function () {
-	}
-}
-
-/**
- * runs this test exclusively on node (not browsers)
- */
-global.node = function (func) {
-	return func
-}
-
-import("../../src/api/Env.js").then((module) => {
-	module.bootFinished()
-	import('./Suite.js')
-})

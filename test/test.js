@@ -14,10 +14,6 @@ import replace from "rollup-plugin-replace"
 // Currently requires changes:
 // ospec: replace require() with import()
 // https://github.com/MithrilJS/ospec/pull/26#issuecomment-668544078
-//
-// nollup: support `global` from node
-// https://github.com/PepsRyuu/nollup/issues/110#issuecomment-668582374
-// (or alternatively use rollup)
 
 let project
 if (process.argv.indexOf("api") !== -1) {
@@ -48,7 +44,8 @@ function readCache(cacheLocation) {
 // Files in build/node_modules are treated as separate libraries and ES mode resets back to commonjs.
 function resolveTestLibsPlugin() {
 	const testLibs = {
-		ospec: "../node_modules/ospec/ospec.js"
+		ospec: "../node_modules/ospec/ospec.js",
+		bluebird: "../node_modules/bluebird/js/browser/bluebird.js"
 	}
 
 	return {
@@ -56,7 +53,6 @@ function resolveTestLibsPlugin() {
 		resolveId(source) {
 			switch (source) {
 				case "util":
-				case "bluebird":
 				case "crypto":
 				case "xhr2":
 				case "express":
@@ -79,14 +75,17 @@ async function build() {
 	// TODO: we could add some watch mode with invalidation for super quick builds
 	console.log("Bundling...")
 	const bundle = await nollup({
-		input: [`${project}/bootstrapNode.js`, `${project}/bootstrapBrowser.js`],
+		input: [
+			`${project}/bootstrapNode.js`,
+			// `${project}/bootstrapBrowser.js`
+		],
 		plugins: [
 			replace({
 				__TUTANOTA_ENV: JSON.stringify(localEnv),
 				include: "**/bootstrap*"
 			}),
-			...rollupDebugPlugins(".."),
 			resolveTestLibsPlugin(),
+			...rollupDebugPlugins(".."),
 		],
 		treeshake: false,
 		preserveModules: true,
@@ -101,10 +100,10 @@ async function build() {
 
 (async function () {
 	try {
-		console.log("Building")
+		console.log("Building...")
 		await build()
 		await createUnitTestHtml()
-		console.log("Testing")
+		console.log("Running tests...")
 		const statusCode = await runTest()
 		process.exit(statusCode)
 	} catch (e) {
@@ -135,7 +134,7 @@ function runTest() {
 async function createUnitTestHtml(watch) {
 	let imports = [`test-${project}.js`]
 
-	const template = "System.import('./browser/test/bootstrapBrowser.js')"
+	const template = "System.import('./browser/test/bootstrapNode.js')"
 	await _writeFile(`../build/test-${project}.js`, [
 		`window.whitelabelCustomizations = null`,
 		`window.env = ${JSON.stringify(localEnv, null, 2)}`,
@@ -145,7 +144,7 @@ async function createUnitTestHtml(watch) {
 	const html = await renderHtml(imports, localEnv)
 	await _writeFile(`../build/test-${project}.html`, html)
 
-	await fs.copy(`${project}/bootstrapBrowser.js`, "../build/test/bootstrapBrowser.js")
+	await fs.copy(`${project}/bootstrapBrowser.js`, "../build/test/bootstrapNode.js")
 }
 
 function _writeFile(targetFile, content) {
