@@ -68,7 +68,7 @@
 		"node-forge": "0.8.3",
 		"node-static": "0.7.11",
 		"nollup": "^0.14.1",
-		"ospec": "4.1.1",
+		"ospec": "git@github.com:tutao/ospec.git#0472107629ede33be4c4d19e89f237a6d7b0cb11",
 		"request": "2.88.0",
 		"rollup-plugin-analyzer": "^3.2.1",
 		"rollup-plugin-replace": "^2.2.0",

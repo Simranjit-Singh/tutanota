@@ -1,36 +1,30 @@
 import bluebird from "bluebird"
-import xhr2 from "xhr2"
-import express from "express"
-import server_destroy from "server-destroy"
-import body_parser from "body-parser"
+import env from "@tutanota/env"
 
-globalThis.env = __TUTANOTA_ENV
+globalThis.env = env
 
 globalThis.Promise = bluebird.Promise
 Promise.config({
-	longStackTraces: true
+	longStackTraces: true,
+	warnings: false,
 })
 
 globalThis.isBrowser = typeof window !== "undefined"
 
 ;(async function () {
+	const noOp = () => {}
+
 	if (isBrowser) {
 		/**
 		 * runs this test exclusively on browsers (not nodec)
 		 */
-		window.browser = function (func) {
-			return func
-		}
+		window.browser = (func) => func
 
 		/**
 		 * runs this test exclusively on node (not browsers)
 		 */
-		window.node = function () {
-			return function () {
-			}
-		}
+		window.node = noOp
 	} else {
-		const noOp = () => {}
 
 		/**
 		 * runs this test exclusively on browsers (not node)
@@ -41,6 +35,8 @@ globalThis.isBrowser = typeof window !== "undefined"
 		 * runs this test exclusively on node (not browsers)
 		 */
 		globalThis.node = func => func
+
+
 		globalThis.btoa = str => Buffer.from(str, 'binary').toString('base64')
 		globalThis.atob = b64Encoded => Buffer.from(b64Encoded, 'base64').toString('binary')
 		globalThis.WebSocket = noOp
@@ -63,16 +59,15 @@ globalThis.isBrowser = typeof window !== "undefined"
 				bytes.set(randomBytes)
 			}
 		}
+
+		globalThis.XMLHttpRequest = (await import("xhr2")).default
+		globalThis.express = (await import("express")).default
+		globalThis.enableDestroy = (await import("server-destroy")).default
+		globalThis.bodyParser = (await import("body-parser")).default
 	}
 
-	globalThis.XMLHttpRequest = xhr2
-	globalThis.express = express
-	globalThis.enableDestroy = server_destroy
-	globalThis.bodyParser = body_parser
-
-	import("../../src/api/Env.js").then((module) => {
-		module.bootFinished()
-		import('./Suite.js')
-	})
+	const Env = await import("../../src/api/Env.js")
+	Env.bootFinished()
+	import('./Suite.js')
 })()
 

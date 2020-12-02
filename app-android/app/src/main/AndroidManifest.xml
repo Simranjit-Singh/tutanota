@@ -61,7 +61,7 @@
                 android:grantUriPermissions="true">
             <meta-data
                     android:name="android.support.FILE_PROVIDER_PATHS"
-                    android:resource="@xml/paths"/>
+                    android:resource="@xml/fl"/>
         </provider>
 
         <service
